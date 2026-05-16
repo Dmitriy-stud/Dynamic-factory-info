@@ -1,21 +1,64 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Справочная система</title>
-    <style>
-        body { font-family: Arial; margin: 40px; }
-        .menu { display: flex; gap: 20px; margin-bottom: 30px; }
-        .menu a { padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; }
-        .menu a:hover { background: #0056b3; }
-    </style>
-</head>
-<body>
-    <h1>📚 Система управления справочниками</h1>
-    <div class="menu">
-        <a href="/factories">Фабрики</a>
-        <a href="/sections">Участки</a>
-        <a href="/equipments">Оборудование</a>
+{% extends "base.html" %}
+
+{% block title %}Главная - Справочная система{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 text-center">
+        <h1 class="display-4 mb-4">
+            <i class="bi bi-database-fill-gear"></i> Система управления справочниками
+        </h1>
+        <p class="lead">Управляйте фабриками, участками и оборудованием в единой системе</p>
+        <hr class="my-4">
     </div>
-    <p>Выберите справочник для работы</p>
-</body>
-</html>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-building fs-1 text-primary"></i>
+                <h3 class="card-title mt-3">Фабрики</h3>
+                <p class="card-text">Управление фабриками, просмотр иерархии участков и оборудования</p>
+                <a href="/factories" class="btn btn-primary">Перейти →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-gear fs-1 text-success"></i>
+                <h3 class="card-title mt-3">Участки</h3>
+                <p class="card-text">Управление производственными участками, привязка к фабрикам</p>
+                <a href="/sections" class="btn btn-success">Перейти →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-tools fs-1 text-info"></i>
+                <h3 class="card-title mt-3">Оборудование</h3>
+                <p class="card-text">Управление оборудованием, привязка к одному или нескольким участкам</p>
+                <a href="/equipments" class="btn btn-info text-white">Перейти →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> <strong>Особенности системы:</strong>
+            <ul class="mt-2 mb-0">
+                <li>Каждая фабрика может иметь несколько участков</li>
+                <li>Каждый участок может иметь несколько типов оборудования</li>
+                <li>Оборудование может принадлежать нескольким участкам</li>
+                <li>Для каждого объекта можно просмотреть всех родителей и детей любого уровня</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
