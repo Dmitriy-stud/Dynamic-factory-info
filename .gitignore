@@ -1,0 +1,53 @@
+# Виртуальное окружение
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Файлы базы данных (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Файлы IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.bak
+
+# Переменные окружения
+.env
+.env.local
+
+# Файлы Alembic (если будешь использовать)
+alembic/versions/*.pyc
+alembic/versions/*.pyo
+
+# Файлы отладки
+instance/
+.webassets-cache
+
+# Файлы тестов и отчетов
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Файлы, специфичные для ОС
+Thumbs.db
+Desktop.ini
