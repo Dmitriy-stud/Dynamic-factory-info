@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Оборудование</title>
+    <style>
+        body { font-family: Arial; margin: 40px; }
+        .container { max-width: 800px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #17a2b8; color: white; }
+        .btn { padding: 5px 10px; background: #28a745; color: white; text-decoration: none; border-radius: 3px; }
+        .btn-delete { background: #dc3545; }
+        .btn-relations { background: #ffc107; color: black; }
+        select, input, button { padding: 5px; margin: 5px; }
+        .nav { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/">Главная</a>
+            <a href="/factories">Фабрики</a>
+            <a href="/sections">Участки</a>
+        </div>
+        
+        <h1>Оборудование</h1>
+        
+        <form method="POST" action="/equipments/create">
+            <input type="text" name="name" placeholder="Название оборудования" required>
+            <select name="section_ids" multiple size="3">
+                {% for section in sections %}
+                <option value="{{ section.id }}">{{ section.name }} ({{ section.factory.name if section.factory else '?' }})</option>
+                {% endfor %}
+            </select>
+            <small>Ctrl+клик для выбора нескольких участков</small>
+            <button type="submit">Добавить</button>
+        </form>
+        
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Название</th><th>Участки</th><th>Действия</th></tr>
+            </thead>
+            <tbody>
+                {% for equipment in equipments %}
+                <tr>
+                    <td>{{ equipment.id }}</td>
+                    <td>{{ equipment.name }}</td>
+                    <td>
+                        {% for section in equipment.sections %}
+                            {{ section.name }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>
+                        <a href="/relations/equipment/{{ equipment.id }}" class="btn btn-relations">Родители/Дети</a>
+                        <a href="/equipments/{{ equipment.id }}/delete" class="btn btn-delete" onclick="return confirm('Удалить?')">Удалить</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

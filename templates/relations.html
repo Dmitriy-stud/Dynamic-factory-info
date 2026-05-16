@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Родители и дети</title>
+    <style>
+        body { font-family: Arial; margin: 40px; }
+        .container { max-width: 800px; margin: auto; }
+        .parents, .children { margin: 20px 0; padding: 15px; border-radius: 5px; }
+        .parents { background: #e7f3ff; border-left: 4px solid #007bff; }
+        .children { background: #e7ffe7; border-left: 4px solid #28a745; }
+        .level { display: inline-block; background: #666; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        .item { margin: 10px 0; padding: 5px; }
+        .nav { margin-bottom: 20px; }
+        a { color: #007bff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/">Главная</a>
+            <a href="/factories">Фабрики</a>
+            <a href="/sections">Участки</a>
+            <a href="/equipments">Оборудование</a>
+        </div>
+        
+        <h1>Иерархия: {{ type_name }} #{{ item_id }}</h1>
+        
+        <div class="parents">
+            <h3>Родительские объекты</h3>
+            {% if parents %}
+                {% for parent in parents %}
+                <div class="item">
+                    <span class="level">Уровень {{ parent.level }}</span>
+                    <strong>{{ parent.name }}</strong> ({{ parent.type }})
+                    <a href="/relations/{{ parent.type }}/{{ parent.id }}">[подробнее]</a>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>Нет родительских объектов (корневой элемент)</p>
+            {% endif %}
+        </div>
+        
+        <div class="children">
+            <h3>Дочерние объекты</h3>
+            {% if children %}
+                {% for child in children %}
+                <div class="item">
+                    <span class="level">Уровень {{ child.level }}</span>
+                    <strong>{{ child.name }}</strong> ({{ child.type }})
+                    <a href="/relations/{{ child.type }}/{{ child.id }}">[подробнее]</a>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>Нет дочерних объектов (листовой элемент)</p>
+            {% endif %}
+        </div>
+        
+        <p><a href="javascript:history.back()">← Назад</a></p>
+    </div>
+</body>
+</html>
