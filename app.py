@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
@@ -11,7 +12,7 @@ db = SQLAlchemy(app)
 class Factory(db.Model):
     __tablename__ = 'factories'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False, unique=True)  # Добавлено unique=True
     
     sections = db.relationship('Section', back_populates='factory', cascade='all, delete-orphan')
     
@@ -24,13 +25,16 @@ class Section(db.Model):
     name = db.Column(db.String(100), nullable=False)
     factory_id = db.Column(db.Integer, db.ForeignKey('factories.id'), nullable=False)
     
+    # Добавляем уникальность названия в рамках одной фабрики
+    __table_args__ = (db.UniqueConstraint('name', 'factory_id', name='unique_section_name_per_factory'),)
+    
     factory = db.relationship('Factory', back_populates='sections')
     equipments = db.relationship('Equipment', secondary='section_equipment', back_populates='sections')
 
 class Equipment(db.Model):
     __tablename__ = 'equipments'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False, unique=True)  # Добавлено unique=True
     
     sections = db.relationship('Section', secondary='section_equipment', back_populates='equipments')
 
@@ -137,10 +141,16 @@ def list_factories():
 def create_factory():
     name = request.form.get('name')
     if name:
+        # Проверка на дубликат
+        existing = Factory.query.filter(func.lower(Factory.name) == func.lower(name)).first()
+        if existing:
+            return jsonify({'success': False, 'error': f'Фабрика с названием "{name}" уже существует!'}), 400
+        
         factory = Factory(name=name)
         db.session.add(factory)
         db.session.commit()
-    return redirect(url_for('list_factories'))
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Название не может быть пустым'}), 400
 
 @app.route('/factories/<int:id>/update', methods=['POST'])
 def update_factory(id):
@@ -148,9 +158,18 @@ def update_factory(id):
     if factory:
         name = request.form.get('name')
         if name:
+            # Проверка на дубликат (исключая текущий объект)
+            existing = Factory.query.filter(
+                func.lower(Factory.name) == func.lower(name),
+                Factory.id != id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': f'Фабрика с названием "{name}" уже существует!'}), 400
+            
             factory.name = name
             db.session.commit()
-    return redirect(url_for('list_factories'))
+            return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Объект не найден'}), 404
 
 @app.route('/factories/<int:id>/delete')
 def delete_factory(id):
@@ -172,23 +191,45 @@ def create_section():
     name = request.form.get('name')
     factory_id = request.form.get('factory_id')
     if name and factory_id:
+        # Проверка на дубликат в рамках фабрики
+        existing = Section.query.filter(
+            func.lower(Section.name) == func.lower(name),
+            Section.factory_id == int(factory_id)
+        ).first()
+        if existing:
+            return jsonify({'success': False, 'error': f'На этой фабрике уже есть участок с названием "{name}"!'}), 400
+        
         section = Section(name=name, factory_id=int(factory_id))
         db.session.add(section)
         db.session.commit()
-    return redirect(url_for('list_sections'))
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Название и фабрика обязательны'}), 400
 
 @app.route('/sections/<int:id>/update', methods=['POST'])
 def update_section(id):
     section = Section.query.get(id)
     if section:
         name = request.form.get('name')
-        if name:
-            section.name = name
         factory_id = request.form.get('factory_id')
+        
+        if name:
+            # Проверка на дубликат (исключая текущий объект)
+            existing = Section.query.filter(
+                func.lower(Section.name) == func.lower(name),
+                Section.factory_id == int(factory_id),
+                Section.id != id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': f'На этой фабрике уже есть участок с названием "{name}"!'}), 400
+            
+            section.name = name
+        
         if factory_id:
             section.factory_id = int(factory_id)
+        
         db.session.commit()
-    return redirect(url_for('list_sections'))
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Объект не найден'}), 404
 
 @app.route('/sections/<int:id>/delete')
 def delete_section(id):
@@ -211,6 +252,11 @@ def create_equipment():
     section_ids = request.form.getlist('section_ids')
     
     if name:
+        # Проверка на дубликат
+        existing = Equipment.query.filter(func.lower(Equipment.name) == func.lower(name)).first()
+        if existing:
+            return jsonify({'success': False, 'error': f'Оборудование с названием "{name}" уже существует!'}), 400
+        
         equipment = Equipment(name=name)
         db.session.add(equipment)
         db.session.flush()
@@ -221,14 +267,24 @@ def create_equipment():
                 equipment.sections.append(section)
         
         db.session.commit()
-    return redirect(url_for('list_equipments'))
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Название не может быть пустым'}), 400
 
 @app.route('/equipments/<int:id>/update', methods=['POST'])
 def update_equipment(id):
     equipment = Equipment.query.get(id)
     if equipment:
         name = request.form.get('name')
+        
         if name:
+            # Проверка на дубликат (исключая текущий объект)
+            existing = Equipment.query.filter(
+                func.lower(Equipment.name) == func.lower(name),
+                Equipment.id != id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': f'Оборудование с названием "{name}" уже существует!'}), 400
+            
             equipment.name = name
         
         # Очищаем существующие связи
@@ -242,7 +298,8 @@ def update_equipment(id):
                 equipment.sections.append(section)
         
         db.session.commit()
-    return redirect(url_for('list_equipments'))
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Объект не найден'}), 404
 
 @app.route('/equipments/<int:id>/delete')
 def delete_equipment(id):
@@ -278,6 +335,18 @@ def get_equipment_sections(id):
         section_ids = [s.id for s in equipment.sections]
         return jsonify({'section_ids': section_ids})
     return jsonify({'section_ids': []})
+
+# ---------- Вспомогательные маршруты для проверки дубликатов ----------
+@app.route('/check/factory', methods=['POST'])
+def check_factory_duplicate():
+    name = request.form.get('name')
+    exclude_id = request.form.get('exclude_id')
+    if name:
+        query = Factory.query.filter(func.lower(Factory.name) == func.lower(name))
+        if exclude_id:
+            query = query.filter(Factory.id != int(exclude_id))
+        return jsonify({'exists': query.first() is not None})
+    return jsonify({'exists': False})
 
 if __name__ == '__main__':
     with app.app_context():
