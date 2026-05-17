@@ -53,6 +53,21 @@ footer {
     }
 }
 
+/* ========== СТИЛИ ДЛЯ СТРАНИЦ АВТОРИЗАЦИИ ========== */
+
+/* Центрирование контента */
+.auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 150px);
+}
+
+.auth-card {
+    max-width: 400px;
+    width: 100%;
+}
+
 /* ========== СТИЛИ ДЛЯ ОБОРУДОВАНИЯ ========== */
 .sections-checkbox-list {
     max-height: 300px;
@@ -203,4 +218,11 @@ footer {
 .object-name {
     font-weight: bold;
     font-size: 1rem;
+}
+
+/* Требования к паролю */
+.password-requirements {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 5px;
 }
