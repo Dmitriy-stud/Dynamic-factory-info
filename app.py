@@ -3,11 +3,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+import functools
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'  # Важно изменить в продакшене!
+app.config['SECRET_KEY'] = 'my-secret-key'
 
 db = SQLAlchemy(app)
 login_manager = LoginManager()
@@ -30,6 +32,20 @@ class User(UserMixin, db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+class EventLog(db.Model):
+    __tablename__ = 'event_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_name = db.Column(db.String(80), nullable=False)
+    action = db.Column(db.String(50), nullable=False)  # create, update, delete
+    entity_type = db.Column(db.String(50), nullable=False)  # factory, section, equipment
+    entity_id = db.Column(db.Integer, nullable=False)
+    entity_name = db.Column(db.String(100), nullable=False)
+    details = db.Column(db.String(500), nullable=True)  # Дополнительная информация
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    
+    user = db.relationship('User', backref='events')
 
 class Factory(db.Model):
     __tablename__ = 'factories'
@@ -63,6 +79,79 @@ section_equipment = db.Table('section_equipment',
     db.Column('section_id', db.Integer, db.ForeignKey('sections.id'), primary_key=True),
     db.Column('equipment_id', db.Integer, db.ForeignKey('equipments.id'), primary_key=True)
 )
+
+# ========== ФУНКЦИЯ ДЛЯ ЛОГИРОВАНИЯ ==========
+
+def log_event(user_id, user_name, action, entity_type, entity_id, entity_name, details=None):
+    """Логирует действие пользователя"""
+    event = EventLog(
+        user_id=user_id,
+        user_name=user_name,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        entity_name=entity_name,
+        details=details,
+        created_at=datetime.now()
+    )
+    db.session.add(event)
+    db.session.commit()
+
+# ========== ДЕКОРАТОР ДЛЯ ЛОГИРОВАНИЯ ==========
+
+def log_action(action, entity_type):
+    """Декоратор для автоматического логирования действий"""
+    def decorator(f):
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            result = f(*args, **kwargs)
+            
+            # Получаем информацию о действии
+            if request.method == 'POST':
+                entity_name = request.form.get('name', '')
+                
+                # Для обновления нужно получить ID из URL
+                if 'update' in request.endpoint:
+                    entity_id = kwargs.get('id')
+                    if entity_id:
+                        old_entity = None
+                        if entity_type == 'factory':
+                            old_entity = Factory.query.get(entity_id)
+                        elif entity_type == 'section':
+                            old_entity = Section.query.get(entity_id)
+                        elif entity_type == 'equipment':
+                            old_entity = Equipment.query.get(entity_id)
+                        
+                        if old_entity and old_entity.name != entity_name:
+                            details = f'Было: "{old_entity.name}", стало: "{entity_name}"'
+                            log_event(
+                                user_id=current_user.id,
+                                user_name=current_user.username,
+                                action=action,
+                                entity_type=entity_type,
+                                entity_id=entity_id,
+                                entity_name=entity_name,
+                                details=details
+                            )
+                        elif old_entity and 'factory_id' in request.form:
+                            # Для участков логируем смену фабрики
+                            pass
+                    else:
+                        # Для создания
+                        if result and hasattr(result, 'json') and result.json.get('success'):
+                            log_event(
+                                user_id=current_user.id,
+                                user_name=current_user.username,
+                                action=action,
+                                entity_type=entity_type,
+                                entity_id=0,  # ID будет обновлен после коммита
+                                entity_name=entity_name,
+                                details=None
+                            )
+            
+            return result
+        return decorated_function
+    return decorator
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -165,6 +254,7 @@ def login():
         
         if user and user.check_password(password):
             login_user(user)
+            log_event(user.id, user.username, 'login', 'user', user.id, user.username, 'Вход в систему')
             flash(f'Добро пожаловать, {user.username}!', 'success')
             next_page = request.args.get('next')
             return redirect(next_page or url_for('index'))
@@ -183,7 +273,6 @@ def register():
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
         
-        # Валидация
         if not username or not password:
             flash('Все поля обязательны для заполнения', 'danger')
         elif password != confirm_password:
@@ -200,8 +289,8 @@ def register():
                 db.session.add(user)
                 db.session.commit()
                 
-                # Автоматически входим после регистрации
                 login_user(user)
+                log_event(user.id, user.username, 'register', 'user', user.id, user.username, 'Регистрация нового пользователя')
                 flash(f'Добро пожаловать, {username}! Регистрация успешно завершена.', 'success')
                 return redirect(url_for('index'))
     
@@ -210,6 +299,7 @@ def register():
 @app.route('/logout')
 @login_required
 def logout():
+    log_event(current_user.id, current_user.username, 'logout', 'user', current_user.id, current_user.username, 'Выход из системы')
     logout_user()
     flash('Вы вышли из системы', 'info')
     return redirect(url_for('login'))
@@ -220,6 +310,13 @@ def logout():
 @login_required
 def index():
     return render_template('index.html')
+
+# ---------- Страница событий ----------
+@app.route('/events')
+@login_required
+def view_events():
+    events = EventLog.query.order_by(EventLog.created_at.desc()).all()
+    return render_template('events.html', events=events)
 
 # ---------- Фабрики ----------
 @app.route('/factories')
@@ -240,6 +337,10 @@ def create_factory():
         factory = Factory(name=name)
         db.session.add(factory)
         db.session.commit()
+        
+        # Логируем создание
+        log_event(current_user.id, current_user.username, 'create', 'factory', factory.id, factory.name, None)
+        
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Название не может быть пустым'}), 400
 
@@ -257,8 +358,14 @@ def update_factory(id):
             if existing:
                 return jsonify({'success': False, 'error': f'Фабрика с названием "{name}" уже существует!'}), 400
             
+            old_name = factory.name
             factory.name = name
             db.session.commit()
+            
+            # Логируем обновление
+            log_event(current_user.id, current_user.username, 'update', 'factory', factory.id, factory.name, 
+                     f'Было: "{old_name}", стало: "{name}"')
+            
             return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Объект не найден'}), 404
 
@@ -267,8 +374,13 @@ def update_factory(id):
 def delete_factory(id):
     factory = Factory.query.get(id)
     if factory:
+        factory_name = factory.name
         db.session.delete(factory)
         db.session.commit()
+        
+        # Логируем удаление
+        log_event(current_user.id, current_user.username, 'delete', 'factory', id, factory_name, None)
+        
     return redirect(url_for('list_factories'))
 
 # ---------- Участки ----------
@@ -295,6 +407,12 @@ def create_section():
         section = Section(name=name, factory_id=int(factory_id))
         db.session.add(section)
         db.session.commit()
+        
+        # Логируем создание
+        factory = Factory.query.get(factory_id)
+        log_event(current_user.id, current_user.username, 'create', 'section', section.id, section.name, 
+                 f'Фабрика: {factory.name if factory else "?"}')
+        
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Название и фабрика обязательны'}), 400
 
@@ -306,21 +424,23 @@ def update_section(id):
         name = request.form.get('name')
         factory_id = request.form.get('factory_id')
         
-        if name:
-            existing = Section.query.filter(
-                func.lower(Section.name) == func.lower(name),
-                Section.factory_id == int(factory_id),
-                Section.id != id
-            ).first()
-            if existing:
-                return jsonify({'success': False, 'error': f'На этой фабрике уже есть участок с названием "{name}"!'}), 400
-            
+        changes = []
+        
+        if name and name != section.name:
+            changes.append(f'Название: "{section.name}" → "{name}"')
             section.name = name
         
-        if factory_id:
+        if factory_id and int(factory_id) != section.factory_id:
+            old_factory = Factory.query.get(section.factory_id)
+            new_factory = Factory.query.get(int(factory_id))
+            changes.append(f'Фабрика: "{old_factory.name if old_factory else "?"}" → "{new_factory.name if new_factory else "?"}"')
             section.factory_id = int(factory_id)
         
-        db.session.commit()
+        if changes:
+            db.session.commit()
+            log_event(current_user.id, current_user.username, 'update', 'section', section.id, section.name, 
+                     ', '.join(changes))
+        
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Объект не найден'}), 404
 
@@ -329,8 +449,13 @@ def update_section(id):
 def delete_section(id):
     section = Section.query.get(id)
     if section:
+        section_name = section.name
         db.session.delete(section)
         db.session.commit()
+        
+        # Логируем удаление
+        log_event(current_user.id, current_user.username, 'delete', 'section', id, section_name, None)
+        
     return redirect(url_for('list_sections'))
 
 # ---------- Оборудование ----------
@@ -356,12 +481,19 @@ def create_equipment():
         db.session.add(equipment)
         db.session.flush()
         
+        section_names = []
         for section_id in section_ids:
             section = Section.query.get(int(section_id))
             if section:
                 equipment.sections.append(section)
+                section_names.append(section.name)
         
         db.session.commit()
+        
+        # Логируем создание
+        log_event(current_user.id, current_user.username, 'create', 'equipment', equipment.id, equipment.name, 
+                 f'Участки: {", ".join(section_names) if section_names else "не привязано"}')
+        
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Название не может быть пустым'}), 400
 
@@ -372,25 +504,35 @@ def update_equipment(id):
     if equipment:
         name = request.form.get('name')
         
-        if name:
-            existing = Equipment.query.filter(
-                func.lower(Equipment.name) == func.lower(name),
-                Equipment.id != id
-            ).first()
-            if existing:
-                return jsonify({'success': False, 'error': f'Оборудование с названием "{name}" уже существует!'}), 400
-            
+        changes = []
+        
+        if name and name != equipment.name:
+            changes.append(f'Название: "{equipment.name}" → "{name}"')
             equipment.name = name
+        
+        # Получаем старые участки
+        old_sections = [s.name for s in equipment.sections]
         
         equipment.sections.clear()
         
         section_ids = request.form.getlist('section_ids')
+        new_sections = []
         for section_id in section_ids:
             section = Section.query.get(int(section_id))
             if section:
                 equipment.sections.append(section)
+                new_sections.append(section.name)
         
-        db.session.commit()
+        if set(old_sections) != set(new_sections):
+            changes.append(f'Участки: [{", ".join(old_sections) if old_sections else "нет"}] → [{", ".join(new_sections) if new_sections else "нет"}]')
+        
+        if changes:
+            db.session.commit()
+            log_event(current_user.id, current_user.username, 'update', 'equipment', equipment.id, equipment.name, 
+                     ', '.join(changes))
+        elif name:
+            db.session.commit()
+        
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Объект не найден'}), 404
 
@@ -399,8 +541,13 @@ def update_equipment(id):
 def delete_equipment(id):
     equipment = Equipment.query.get(id)
     if equipment:
+        equipment_name = equipment.name
         db.session.delete(equipment)
         db.session.commit()
+        
+        # Логируем удаление
+        log_event(current_user.id, current_user.username, 'delete', 'equipment', id, equipment_name, None)
+        
     return redirect(url_for('list_equipments'))
 
 # ---------- Просмотр родителей/детей ----------
