@@ -566,9 +566,21 @@ def view_relations(type, id):
         'equipment': 'Оборудование'
     }
     
+    entity_name = ''
+    if type == 'factory':
+        entity = Factory.query.get(id)
+        entity_name = entity.name if entity else ''
+    elif type == 'section':
+        entity = Section.query.get(id)
+        entity_name = entity.name if entity else ''
+    elif type == 'equipment':
+        entity = Equipment.query.get(id)
+        entity_name = entity.name if entity else ''
+    
     return render_template('relations.html', 
                          item_type=type, 
                          item_id=id,
+                         item_name=entity_name,
                          type_name=names.get(type, type),
                          parents=parents, 
                          children=children)
