@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Журнал событий{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-journal-bookmark-fill"></i> Журнал событий
+            </h1>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> На главную
+            </a>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 160px;">Дата и время</th>
+                                <th style="width: 120px;">Пользователь</th>
+                                <th style="width: 80px;">Действие</th>
+                                <th style="width: 120px;">Тип объекта</th>
+                                <th>Объект</th>
+                                <th>Детали</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-clock"></i> 
+                                        {{ event.created_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                                    </span>
+                                
+                                <td>
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-person"></i> {{ event.user_name }}
+                                    </span>
+                                
+                                <td>
+                                    {% if event.action == 'create' %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-plus-circle"></i> Создание
+                                        </span>
+                                    {% elif event.action == 'update' %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-pencil-square"></i> Изменение
+                                        </span>
+                                    {% elif event.action == 'delete' %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-trash"></i> Удаление
+                                        </span>
+                                    {% elif event.action == 'login' %}
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-box-arrow-in-right"></i> Вход
+                                        </span>
+                                    {% elif event.action == 'logout' %}
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-box-arrow-right"></i> Выход
+                                        </span>
+                                    {% elif event.action == 'register' %}
+                                        <span class="badge bg-dark">
+                                            <i class="bi bi-person-plus"></i> Регистрация
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ event.action }}</span>
+                                    {% endif %}
+                                
+                                <td>
+                                    {% if event.entity_type == 'factory' %}
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-building"></i> Фабрика
+                                        </span>
+                                    {% elif event.entity_type == 'section' %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-gear"></i> Участок
+                                        </span>
+                                    {% elif event.entity_type == 'equipment' %}
+                                        <span class="badge bg-info">
+                                            <i class="bi bi-tools"></i> Оборудование
+                                        </span>
+                                    {% elif event.entity_type == 'user' %}
+                                        <span class="badge bg-dark">
+                                            <i class="bi bi-person-badge"></i> Пользователь
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ event.entity_type }}</span>
+                                    {% endif %}
+                                
+                                <td>
+                                    <strong>{{ event.entity_name }}</strong>
+                                    <br>
+                                    <small class="text-muted">ID: {{ event.entity_id }}</small>
+                                
+                                <td>
+                                    {% if event.details %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i> {{ event.details }}
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted">—</small>
+                                    {% endif %}
+                                
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <i class="bi bi-inbox"></i> Нет событий
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Информационная панель -->
+        <div class="alert alert-info mt-3">
+            <i class="bi bi-info-circle"></i>
+            <strong>Информация:</strong>
+            <ul class="mb-0 mt-2">
+                <li>В журнале отображаются все действия пользователей: создание, изменение, удаление объектов</li>
+                <li>Также фиксируются вход, выход и регистрация пользователей</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

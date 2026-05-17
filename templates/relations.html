@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Иерархия - {{ type_name }}: {{ item_name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Главная</a></li>
+                <li class="breadcrumb-item"><a href="/{{ item_type }}s">{{ type_name }}</a></li>
+                <li class="breadcrumb-item active">{{ item_name }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-diagram-3"></i> Иерархия объекта
+            </h1>
+            <div>
+                <span class="badge bg-primary fs-5 p-2">
+                    <i class="bi bi-info-circle"></i> {{ type_name }}: {{ item_name }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Родители (слева) -->
+            <div class="col-md-6 mb-4">
+                <div class="card border-primary h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-arrow-up-circle"></i> Родительские объекты
+                        </h5>
+                        <!-- Кнопка добавления родителя (если возможно) -->
+                        {% if item_type == 'equipment' %}
+                            <a href="/sections" class="btn btn-sm btn-light btn-add">
+                                <i class="bi bi-plus-circle"></i> Добавить участок
+                            </a>
+                        {% elif item_type == 'section' %}
+                            <a href="/factories" class="btn btn-sm btn-light btn-add">
+                                <i class="bi bi-plus-circle"></i> Добавить фабрику
+                            </a>
+                        {% endif %}
+                    </div>
+                    <div class="card-body tree-container">
+                        {% if parents %}
+                            {% for parent in parents %}
+                            <div class="tree-item tree-level-{{ parent.level }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="object-info">
+                                        <span class="level-badge">
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-arrow-up"></i> Ур. {{ parent.level }}
+                                            </span>
+                                        </span>
+                                        
+                                        <!-- Иконка в зависимости от типа -->
+                                        {% if parent.type == 'factory' %}
+                                            <i class="bi bi-building type-icon type-factory"></i>
+                                        {% elif parent.type == 'section' %}
+                                            <i class="bi bi-gear type-icon type-section"></i>
+                                        {% else %}
+                                            <i class="bi bi-tools type-icon type-equipment"></i>
+                                        {% endif %}
+                                        
+                                        <span class="object-name">{{ parent.name }}</span>
+                                        
+                                        <!-- Плашка типа объекта -->
+                                        <span class="type-badge 
+                                            {% if parent.type == 'factory' %}type-badge-factory
+                                            {% elif parent.type == 'section' %}type-badge-section
+                                            {% else %}type-badge-equipment{% endif %}">
+                                            <i class="bi 
+                                                {% if parent.type == 'factory' %}bi-building
+                                                {% elif parent.type == 'section' %}bi-gear
+                                                {% else %}bi-tools{% endif %}"></i>
+                                            {% if parent.type == 'factory' %}Фабрика
+                                            {% elif parent.type == 'section' %}Участок
+                                            {% else %}Оборудование{% endif %}
+                                        </span>
+                                    </div>
+                                    <a href="/relations/{{ parent.type }}/{{ parent.id }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Подробнее
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle"></i> Нет родительских объектов
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Дети (справа) с отступами по уровням -->
+            <div class="col-md-6 mb-4">
+                <div class="card border-success h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-arrow-down-circle"></i> Дочерние объекты
+                        </h5>
+                        <!-- Кнопка добавления ребенка (если возможно) -->
+                        {% if item_type == 'factory' %}
+                            <a href="/sections" class="btn btn-sm btn-light btn-add">
+                                <i class="bi bi-plus-circle"></i> Добавить участок
+                            </a>
+                        {% elif item_type == 'section' %}
+                            <a href="/equipments" class="btn btn-sm btn-light btn-add">
+                                <i class="bi bi-plus-circle"></i> Добавить оборудование
+                            </a>
+                        {% endif %}
+                    </div>
+                    <div class="card-body tree-container">
+                        {% if children %}
+                            {% for child in children %}
+                            <div class="tree-item tree-level-{{ child.level }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="object-info flex-grow-1">
+                                        <span class="level-badge">
+                                            <span class="badge {% if child.level == 1 %}bg-success{% elif child.level == 2 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                                <i class="bi bi-arrow-down"></i> Ур. {{ child.level }}
+                                            </span>
+                                        </span>
+                                        
+                                        <!-- Иконка в зависимости от типа -->
+                                        {% if child.type == 'factory' %}
+                                            <i class="bi bi-building type-icon type-factory"></i>
+                                        {% elif child.type == 'section' %}
+                                            <i class="bi bi-gear type-icon type-section"></i>
+                                        {% else %}
+                                            <i class="bi bi-tools type-icon type-equipment"></i>
+                                        {% endif %}
+                                        
+                                        <span class="object-name">{{ child.name }}</span>
+                                        
+                                        <!-- Плашка типа объекта -->
+                                        <span class="type-badge 
+                                            {% if child.type == 'factory' %}type-badge-factory
+                                            {% elif child.type == 'section' %}type-badge-section
+                                            {% else %}type-badge-equipment{% endif %}">
+                                            <i class="bi 
+                                                {% if child.type == 'factory' %}bi-building
+                                                {% elif child.type == 'section' %}bi-gear
+                                                {% else %}bi-tools{% endif %}"></i>
+                                            {% if child.type == 'factory' %}Фабрика
+                                            {% elif child.type == 'section' %}Участок
+                                            {% else %}Оборудование{% endif %}
+                                        </span>
+                                    </div>
+                                    <a href="/relations/{{ child.type }}/{{ child.id }}" class="btn btn-sm btn-outline-success ms-3">
+                                        <i class="bi bi-eye"></i> Подробнее
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-warning mb-0">
+                                <i class="bi bi-exclamation-triangle"></i> Нет дочерних объектов
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="javascript:history.back()" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Назад
+            </a>
+            <a href="/" class="btn btn-outline-primary">
+                <i class="bi bi-house"></i> На главную
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
