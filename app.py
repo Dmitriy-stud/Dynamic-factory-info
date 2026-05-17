@@ -301,7 +301,6 @@ def register():
 def logout():
     log_event(current_user.id, current_user.username, 'logout', 'user', current_user.id, current_user.username, 'Выход из системы')
     logout_user()
-    flash('Вы вышли из системы', 'info')
     return redirect(url_for('login'))
 
 # ========== ЗАЩИЩЕННЫЕ МАРШРУТЫ ==========
