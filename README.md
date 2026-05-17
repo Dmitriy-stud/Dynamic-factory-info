@@ -59,12 +59,31 @@
 ## 4. Скриншоты проекта
 
 ![Страница входа в систему](screenshots/login.png)
+Страница входа в систему
+
 ![Страница регистрации](screenshots/register.png)
+Страница регистрации
+
 ![Таблица фабрик](screenshots/factories.png)
-![Окно добавления фабрики](screenshots/factories_add.png.png)
+Таблица фабрик
+
+![Окно добавления фабрики](screenshots/factories_add.png)
+Окно добавления фабрики
+
 ![Таблица участков](screenshots/sections.png)
+Таблица участков
+
 ![Окно добавления участка](screenshots/sections_add.png)
-![Таблица оборудования](screenshots/equipment.png.png)
-![Окно добавления оборудования](screenshots/equipment_add.png.png)
-![Просмотр иерархии объекта](screenshots/hierarchy.png.png)
-![Таблица событий в системе](screenshots/event_logs.png.png)
+Окно добавления участка
+
+![Таблица оборудования](screenshots/equipment.png)
+Таблица оборудования
+
+![Окно добавления оборудования](screenshots/equipment_add.png)
+Окно добавления оборудования
+
+![Просмотр иерархии объекта](screenshots/hierarchy.png)
+Просмотр иерархии объекта
+
+![Таблица событий в системе](screenshots/event_logs.png)
+Таблица событий в системе
