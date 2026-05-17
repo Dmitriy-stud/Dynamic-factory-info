@@ -424,22 +424,26 @@ def update_section(id):
         name = request.form.get('name')
         factory_id = request.form.get('factory_id')
         
-        changes = []
+        if name:
+            # Проверка на дубликат (исключая текущий объект)
+            existing = Section.query.filter(
+                func.lower(Section.name) == func.lower(name),
+                Section.factory_id == int(factory_id),
+                Section.id != id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': f'На этой фабрике уже есть участок с названием "{name}"!'}), 400
         
-        if name and name != section.name:
-            changes.append(f'Название: "{section.name}" → "{name}"')
+        if name:
             section.name = name
-        
-        if factory_id and int(factory_id) != section.factory_id:
-            old_factory = Factory.query.get(section.factory_id)
-            new_factory = Factory.query.get(int(factory_id))
-            changes.append(f'Фабрика: "{old_factory.name if old_factory else "?"}" → "{new_factory.name if new_factory else "?"}"')
+        if factory_id:
             section.factory_id = int(factory_id)
         
-        if changes:
-            db.session.commit()
-            log_event(current_user.id, current_user.username, 'update', 'section', section.id, section.name, 
-                     ', '.join(changes))
+        db.session.commit()
+        
+        # Логируем изменения
+        log_event(current_user.id, current_user.username, 'update', 'section', section.id, section.name, 
+                 f'Изменены данные')
         
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Объект не найден'}), 404

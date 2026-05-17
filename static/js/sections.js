@@ -44,11 +44,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (response.ok && result.success) {
                     window.location.reload();
                 } else {
-                    sectionNameError.textContent = result.error || 'Ошибка при создании';
-                    sectionNameInput.classList.add('is-invalid');
+                    // Показываем ошибку от сервера
+                    const errorMessage = result.error || 'Ошибка при создании';
+                    if (errorMessage.includes('участок') || errorMessage.includes('названием')) {
+                        sectionNameError.textContent = errorMessage;
+                        sectionNameInput.classList.add('is-invalid');
+                    } else {
+                        sectionNameError.textContent = errorMessage;
+                        sectionNameInput.classList.add('is-invalid');
+                    }
                 }
             } catch (error) {
-                sectionNameError.textContent = 'Ошибка сети';
+                console.error('Ошибка:', error);
+                sectionNameError.textContent = 'Ошибка сети. Попробуйте позже.';
                 sectionNameInput.classList.add('is-invalid');
             }
         });
@@ -86,8 +94,10 @@ document.addEventListener('DOMContentLoaded', function() {
         editBtn.classList.remove('btn-success');
         editBtn.classList.add('btn-outline-primary');
         cancelBtn.style.display = 'none';
+        // Возвращаем исходное значение имени
         nameInput.value = nameDisplay.textContent;
         
+        // Возвращаем исходный выбранный элемент в select
         const currentFactoryText = factoryDisplay.querySelector('.badge').textContent;
         for (let option of factorySelect.options) {
             if (option.text === currentFactoryText) {
@@ -126,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (response.ok && result.success) {
+                // Успешное сохранение
                 nameDisplay.textContent = newName;
                 const selectedFactoryText = factorySelect.options[factorySelect.selectedIndex].text;
                 factoryDisplay.innerHTML = `<span class="badge bg-primary">${selectedFactoryText}</span>`;
@@ -140,10 +151,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 cancelBtn.style.display = 'none';
                 currentEditingRow = null;
             } else {
+                // Ошибка от сервера (дубликат и т.д.)
                 alert(result.error || 'Ошибка при сохранении');
+                // Остаемся в режиме редактирования
+                nameInput.focus();
             }
         } catch (error) {
-            alert('Ошибка сети');
+            console.error('Ошибка сети:', error);
+            alert('Ошибка сети. Проверьте подключение и попробуйте снова.');
         }
     }
     
@@ -159,8 +174,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const cancelBtn = row.querySelector('.cancel-edit-btn');
             
             if (currentEditingRow === row) {
+                // Сохраняем изменения
                 saveSectionChanges(id, row, nameInput, nameDisplay, factorySelectElem, factoryDisplay, editBtn, cancelBtn);
             } else {
+                // Если есть другая редактируемая строка, сначала отменяем её редактирование
                 if (currentEditingRow) {
                     const prevRow = currentEditingRow;
                     const prevNameDisplay = prevRow.querySelector('.name-display');
@@ -173,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     cancelEditing(prevRow, prevNameDisplay, prevNameInput, prevFactoryDisplay, prevFactorySelect, prevEditBtn, prevCancelBtn);
                 }
                 
+                // Включаем режим редактирования для текущей строки
                 nameDisplay.style.display = 'none';
                 nameInput.style.display = 'inline-block';
                 factoryDisplay.style.display = 'none';
@@ -184,6 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cancelBtn.style.display = 'inline-block';
                 currentEditingRow = row;
                 
+                // Сохранение по Enter
                 const handleKeyPress = function(e) {
                     if (e.key === 'Enter') {
                         saveSectionChanges(id, row, nameInput, nameDisplay, factorySelectElem, factoryDisplay, editBtn, cancelBtn);
@@ -192,6 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 nameInput.addEventListener('keypress', handleKeyPress);
                 
+                // Отмена по Escape
                 const handleKeyDown = function(e) {
                     if (e.key === 'Escape') {
                         cancelEditing(row, nameDisplay, nameInput, factoryDisplay, factorySelectElem, editBtn, cancelBtn);
@@ -201,6 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 nameInput.addEventListener('keydown', handleKeyDown);
                 
+                // Обработчик кнопки отмены
                 cancelBtn.onclick = function() {
                     cancelEditing(row, nameDisplay, nameInput, factoryDisplay, factorySelectElem, editBtn, cancelBtn);
                     currentEditingRow = null;
