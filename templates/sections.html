@@ -63,16 +63,32 @@
                         </thead>
                         <tbody>
                             {% for section in sections %}
-                            <tr>
+                            <tr id="section-row-{{ section.id }}">
                                 <td>{{ section.id }}</td>
-                                <td>{{ section.name }}</td>
-                                <td>
-                                    <span class="badge bg-primary">{{ section.factory.name if section.factory else '—' }}</span>
+                                <td class="editable-name">
+                                    <span class="name-display">{{ section.name }}</span>
+                                    <input type="text" class="form-control form-control-sm edit-name-input" 
+                                           style="display:none; width:200px;" value="{{ section.name }}">
+                                </td>
+                                <td class="editable-factory">
+                                    <span class="factory-display">
+                                        <span class="badge bg-primary">{{ section.factory.name if section.factory else '—' }}</span>
+                                    </span>
+                                    <select class="form-select form-select-sm edit-factory-select" style="display:none; width:200px;">
+                                        {% for factory in factories %}
+                                        <option value="{{ factory.id }}" {% if section.factory and section.factory.id == factory.id %}selected{% endif %}>
+                                            {{ factory.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
                                 </td>
                                 <td>
                                     <span class="badge bg-info">{{ section.equipments|length }}</span>
                                 </td>
                                 <td>
+                                    <button class="btn btn-sm btn-outline-primary edit-section-btn" data-id="{{ section.id }}">
+                                        <i class="bi bi-pencil"></i> Изменить
+                                    </button>
                                     <a href="/relations/section/{{ section.id }}" class="btn btn-sm btn-warning">
                                         <i class="bi bi-diagram-3"></i> Иерархия
                                     </a>
@@ -96,4 +112,91 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentEditingRow = null;
+    
+    document.querySelectorAll('.edit-section-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const row = document.getElementById(`section-row-${id}`);
+            const nameDisplay = row.querySelector('.name-display');
+            const nameInput = row.querySelector('.edit-name-input');
+            const factoryDisplay = row.querySelector('.factory-display');
+            const factorySelect = row.querySelector('.edit-factory-select');
+            const editBtn = this;
+            
+            if (currentEditingRow === row) {
+                // Сохраняем изменения
+                const newName = nameInput.value.trim();
+                const newFactoryId = factorySelect.value;
+                
+                if (newName) {
+                    fetch(`/sections/${id}/update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `name=${encodeURIComponent(newName)}&factory_id=${newFactoryId}`
+                    }).then(response => {
+                        if (response.ok) {
+                            nameDisplay.textContent = newName;
+                            const selectedFactoryText = factorySelect.options[factorySelect.selectedIndex].text;
+                            factoryDisplay.innerHTML = `<span class="badge bg-primary">${selectedFactoryText}</span>`;
+                            
+                            nameDisplay.style.display = 'inline';
+                            nameInput.style.display = 'none';
+                            factoryDisplay.style.display = 'inline-block';
+                            factorySelect.style.display = 'none';
+                            editBtn.innerHTML = '<i class="bi bi-pencil"></i> Изменить';
+                            editBtn.classList.remove('btn-success');
+                            editBtn.classList.add('btn-outline-primary');
+                            currentEditingRow = null;
+                        } else {
+                            alert('Ошибка при сохранении');
+                        }
+                    });
+                }
+            } else {
+                // Если есть другая редактируемая строка, сначала отменяем её редактирование
+                if (currentEditingRow) {
+                    const prevRow = currentEditingRow;
+                    const prevNameDisplay = prevRow.querySelector('.name-display');
+                    const prevNameInput = prevRow.querySelector('.edit-name-input');
+                    const prevFactoryDisplay = prevRow.querySelector('.factory-display');
+                    const prevFactorySelect = prevRow.querySelector('.edit-factory-select');
+                    const prevEditBtn = prevRow.querySelector('.edit-section-btn');
+                    
+                    prevNameDisplay.style.display = 'inline';
+                    prevNameInput.style.display = 'none';
+                    prevFactoryDisplay.style.display = 'inline-block';
+                    prevFactorySelect.style.display = 'none';
+                    prevEditBtn.innerHTML = '<i class="bi bi-pencil"></i> Изменить';
+                    prevEditBtn.classList.remove('btn-success');
+                    prevEditBtn.classList.add('btn-outline-primary');
+                }
+                
+                // Включаем режим редактирования для текущей строки
+                nameDisplay.style.display = 'none';
+                nameInput.style.display = 'inline-block';
+                factoryDisplay.style.display = 'none';
+                factorySelect.style.display = 'inline-block';
+                nameInput.focus();
+                editBtn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранить';
+                editBtn.classList.remove('btn-outline-primary');
+                editBtn.classList.add('btn-success');
+                currentEditingRow = row;
+                
+                // Сохранение по Enter
+                nameInput.onkeypress = function(e) {
+                    if (e.key === 'Enter') {
+                        editBtn.click();
+                    }
+                };
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

@@ -78,7 +78,7 @@
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <form method="POST" action="/equipments/create" id="equipmentForm">
+                    <form method="POST" action="/equipments/create">
                         <div class="modal-body">
                             <div class="mb-3">
                                 <label for="name" class="form-label">Название оборудования</label>
@@ -153,7 +153,7 @@
                         </thead>
                         <tbody>
                             {% for equipment in equipments %}
-                            <tr>
+                            <tr id="equipment-row-{{ equipment.id }}">
                                 <td>{{ equipment.id }}</td>
                                 <td>{{ equipment.name }}</td>
                                 <td>
@@ -168,6 +168,11 @@
                                     {% endfor %}
                                 </td>
                                 <td>
+                                    <button class="btn btn-sm btn-outline-primary edit-equipment-btn" 
+                                            data-id="{{ equipment.id }}" 
+                                            data-name="{{ equipment.name }}">
+                                        <i class="bi bi-pencil"></i> Изменить
+                                    </button>
                                     <a href="/relations/equipment/{{ equipment.id }}" class="btn btn-sm btn-warning">
                                         <i class="bi bi-diagram-3"></i> Иерархия
                                     </a>
@@ -192,17 +197,78 @@
     </div>
 </div>
 
+<!-- Модальное окно для редактирования (вынесено за пределы, чтобы не путать) -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square"></i> Редактировать оборудование
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="editForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_name" class="form-label">Название оборудования</label>
+                        <input type="text" class="form-control" id="edit_name" name="name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-gear"></i> Выберите участки (можно несколько)
+                        </label>
+                        
+                        <div class="select-all-btn">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="selectAllBtnEdit">
+                                <i class="bi bi-check-all"></i> Выбрать все
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllBtnEdit">
+                                <i class="bi bi-x-circle"></i> Снять все
+                            </button>
+                            <span class="selected-count text-muted" id="selectedCountEdit">
+                                Выбрано: 0
+                            </span>
+                        </div>
+                        
+                        <div class="sections-checkbox-list" id="sectionsListEdit">
+                            <!-- JS заполнит -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-info">
+                        <i class="bi bi-save"></i> Сохранить изменения
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-    // Подсчет выбранных чекбоксов
+// Получаем данные участков из Python и передаем в JavaScript
+const allSections = [
+    {% for section in sections %}
+    {
+        id: {{ section.id }},
+        name: "{{ section.name | escape }}",
+        factory_name: "{{ section.factory.name if section.factory else 'без фабрики' | escape }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // ========== СКРИПТ ДЛЯ МОДАЛЬНОГО ОКНА СОЗДАНИЯ ==========
     function updateSelectedCount() {
-        const checkboxes = document.querySelectorAll('input[name="section_ids"]');
-        const checkedCount = document.querySelectorAll('input[name="section_ids"]:checked').length;
+        const checkboxes = document.querySelectorAll('#sectionsList input[name="section_ids"]');
+        const checkedCount = document.querySelectorAll('#sectionsList input[name="section_ids"]:checked').length;
         const countSpan = document.getElementById('selectedCount');
         if (countSpan) {
             countSpan.textContent = `Выбрано: ${checkedCount}`;
         }
         
-        // Меняем стиль для выбранных элементов
         checkboxes.forEach(checkbox => {
             const parentDiv = checkbox.closest('.section-checkbox-item');
             if (checkbox.checked) {
@@ -215,67 +281,176 @@
         });
     }
     
-    // Выбрать все
-    function selectAll() {
-        const checkboxes = document.querySelectorAll('input[name="section_ids"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = true;
-        });
+    function selectAllCreate() {
+        document.querySelectorAll('#sectionsList input[name="section_ids"]').forEach(cb => cb.checked = true);
         updateSelectedCount();
     }
     
-    // Снять все
-    function deselectAll() {
-        const checkboxes = document.querySelectorAll('input[name="section_ids"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = false;
-        });
+    function deselectAllCreate() {
+        document.querySelectorAll('#sectionsList input[name="section_ids"]').forEach(cb => cb.checked = false);
         updateSelectedCount();
     }
     
-    // Добавляем обработчики после загрузки страницы
-    document.addEventListener('DOMContentLoaded', function() {
-        const selectAllBtn = document.getElementById('selectAllBtn');
-        const deselectAllBtn = document.getElementById('deselectAllBtn');
-        
-        if (selectAllBtn) {
-            selectAllBtn.addEventListener('click', selectAll);
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    if (selectAllBtn) selectAllBtn.addEventListener('click', selectAllCreate);
+    if (deselectAllBtn) deselectAllBtn.addEventListener('click', deselectAllCreate);
+    
+    document.querySelectorAll('#sectionsList input[name="section_ids"]').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+    
+    // Клик по строке чекбокса
+    document.querySelectorAll('#sectionsList .section-checkbox-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'INPUT') {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    updateSelectedCount();
+                }
+            }
+        });
+    });
+    
+    const createModal = document.getElementById('createModal');
+    if (createModal) {
+        createModal.addEventListener('show.bs.modal', function() {
+            updateSelectedCount();
+        });
+    }
+    
+    updateSelectedCount();
+    
+    // ========== СКРИПТ ДЛЯ МОДАЛЬНОГО ОКНА РЕДАКТИРОВАНИЯ ==========
+    const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    const editForm = document.getElementById('editForm');
+    let currentEquipmentId = null;
+    
+    function updateSelectedCountEdit() {
+        const checkboxes = document.querySelectorAll('#sectionsListEdit input[name="section_ids_edit"]');
+        const checkedCount = document.querySelectorAll('#sectionsListEdit input[name="section_ids_edit"]:checked').length;
+        const countSpan = document.getElementById('selectedCountEdit');
+        if (countSpan) {
+            countSpan.textContent = `Выбрано: ${checkedCount}`;
         }
-        if (deselectAllBtn) {
-            deselectAllBtn.addEventListener('click', deselectAll);
-        }
         
-        // Добавляем обработчики на все чекбоксы
-        const checkboxes = document.querySelectorAll('input[name="section_ids"]');
         checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateSelectedCount);
+            const parentDiv = checkbox.closest('.section-checkbox-item');
+            if (checkbox.checked) {
+                parentDiv.style.backgroundColor = '#e7f3ff';
+                parentDiv.style.borderLeft = '3px solid #0d6efd';
+            } else {
+                parentDiv.style.backgroundColor = 'white';
+                parentDiv.style.borderLeft = 'none';
+            }
+        });
+    }
+    
+    // Заполнить список участков для редактирования
+    function populateSectionsList(selectedSectionIds) {
+        const container = document.getElementById('sectionsListEdit');
+        container.innerHTML = '';
+        
+        allSections.forEach(section => {
+            const isChecked = selectedSectionIds.includes(section.id);
+            const div = document.createElement('div');
+            div.className = 'section-checkbox-item';
+            div.innerHTML = `
+                <label>
+                    <input type="checkbox" name="section_ids_edit" value="${section.id}" ${isChecked ? 'checked' : ''}>
+                    <strong>${section.name}</strong>
+                    <span class="section-factory-name">
+                        <i class="bi bi-building"></i> ${section.factory_name}
+                    </span>
+                </label>
+            `;
+            container.appendChild(div);
         });
         
-        // Обновляем счетчик при открытии модального окна
-        const modal = document.getElementById('createModal');
-        if (modal) {
-            modal.addEventListener('show.bs.modal', function() {
-                updateSelectedCount();
-            });
-        }
-        
-        // Первоначальный подсчет
-        updateSelectedCount();
-        
-        // Клик по всей строке для удобства
-        const sectionItems = document.querySelectorAll('.section-checkbox-item');
-        sectionItems.forEach(item => {
+        // Добавляем обработчики
+        document.querySelectorAll('#sectionsListEdit .section-checkbox-item').forEach(item => {
             item.addEventListener('click', function(e) {
-                // Если клик не по самому чекбоксу, то переключаем его
                 if (e.target.tagName !== 'INPUT') {
                     const checkbox = this.querySelector('input[type="checkbox"]');
                     if (checkbox) {
                         checkbox.checked = !checkbox.checked;
-                        updateSelectedCount();
+                        updateSelectedCountEdit();
                     }
                 }
             });
         });
+        
+        document.querySelectorAll('#sectionsListEdit input[name="section_ids_edit"]').forEach(cb => {
+            cb.addEventListener('change', updateSelectedCountEdit);
+        });
+        
+        updateSelectedCountEdit();
+    }
+    
+    // Обработчик для кнопок редактирования
+    document.querySelectorAll('.edit-equipment-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            currentEquipmentId = this.dataset.id;
+            const currentName = this.dataset.name;
+            
+            document.getElementById('edit_name').value = currentName;
+            editForm.action = `/equipments/${currentEquipmentId}/update`;
+            
+            // Получаем текущие связи оборудования
+            try {
+                const response = await fetch(`/equipments/${currentEquipmentId}/sections`);
+                const data = await response.json();
+                const currentSections = data.section_ids || [];
+                populateSectionsList(currentSections);
+            } catch (error) {
+                console.error('Ошибка загрузки связей:', error);
+                populateSectionsList([]);
+            }
+            
+            editModal.show();
+        });
     });
+    
+    // Обработчик кнопок "Выбрать все" и "Снять все" для редактирования
+    document.getElementById('selectAllBtnEdit')?.addEventListener('click', () => {
+        document.querySelectorAll('#sectionsListEdit input[name="section_ids_edit"]').forEach(cb => cb.checked = true);
+        updateSelectedCountEdit();
+    });
+    
+    document.getElementById('deselectAllBtnEdit')?.addEventListener('click', () => {
+        document.querySelectorAll('#sectionsListEdit input[name="section_ids_edit"]').forEach(cb => cb.checked = false);
+        updateSelectedCountEdit();
+    });
+    
+    // Отправка формы редактирования
+    editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const selectedSections = [];
+        document.querySelectorAll('#sectionsListEdit input[name="section_ids_edit"]:checked').forEach(cb => {
+            selectedSections.push(cb.value);
+        });
+        
+        const formData = new FormData();
+        formData.append('name', document.getElementById('edit_name').value);
+        selectedSections.forEach(sectionId => {
+            formData.append('section_ids', sectionId);
+        });
+        
+        fetch(editForm.action, {
+            method: 'POST',
+            body: formData
+        }).then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Ошибка при сохранении');
+            }
+        }).catch(error => {
+            alert('Ошибка сети: ' + error);
+        });
+    });
+});
 </script>
 {% endblock %}

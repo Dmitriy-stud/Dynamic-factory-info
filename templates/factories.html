@@ -53,13 +53,26 @@
                         </thead>
                         <tbody>
                             {% for factory in factories %}
-                            <tr>
+                            <tr id="factory-row-{{ factory.id }}">
                                 <td>{{ factory.id }}</td>
-                                <td>{{ factory.name }}</td>
+                                <td class="editable-name" data-id="{{ factory.id }}" data-type="factory">
+                                    <span class="name-display">{{ factory.name }}</span>
+                                    <input type="text" class="form-control form-control-sm edit-input" 
+                                           style="display:none; width:200px;" value="{{ factory.name }}">
+                                    <button class="btn btn-sm btn-success save-btn" style="display:none; margin-left:5px;">
+                                        <i class="bi bi-check"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-secondary cancel-btn" style="display:none;">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </td>
                                 <td>
                                     <span class="badge bg-info">{{ factory.sections|length }}</span>
                                 </td>
                                 <td>
+                                    <button class="btn btn-sm btn-outline-primary edit-factory-btn" data-id="{{ factory.id }}">
+                                        <i class="bi bi-pencil"></i> Изменить
+                                    </button>
                                     <a href="/relations/factory/{{ factory.id }}" class="btn btn-sm btn-warning">
                                         <i class="bi bi-diagram-3"></i> Иерархия
                                     </a>
@@ -67,14 +80,14 @@
                                        onclick="return confirm('Удалить фабрику {{ factory.name }}? Все связанные участки и оборудование также будут удалены.')">
                                         <i class="bi bi-trash"></i> Удалить
                                     </a>
-                                </td>
-                            </tr>
+                                 </td>
+                             </tr>
                             {% else %}
                             <tr>
                                 <td colspan="4" class="text-center text-muted">
                                     <i class="bi bi-inbox"></i> Нет фабрик. Создайте первую!
-                                </td>
-                            </tr>
+                                 </td>
+                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -83,4 +96,79 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработчики для кнопок редактирования
+    document.querySelectorAll('.edit-factory-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const row = document.getElementById(`factory-row-${id}`);
+            const displaySpan = row.querySelector('.name-display');
+            const editInput = row.querySelector('.edit-input');
+            const editBtn = this;
+            
+            if (editInput.style.display === 'none') {
+                // Переключаемся в режим редактирования
+                displaySpan.style.display = 'none';
+                editInput.style.display = 'inline-block';
+                editInput.focus();
+                editBtn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранить';
+                editBtn.classList.remove('btn-outline-primary');
+                editBtn.classList.add('btn-success');
+                
+                // Сохранение по Enter
+                editInput.onkeypress = function(e) {
+                    if (e.key === 'Enter') {
+                        saveFactoryChanges(id, editInput, displaySpan, editBtn);
+                    }
+                };
+            } else {
+                // Сохраняем изменения
+                saveFactoryChanges(id, editInput, displaySpan, editBtn);
+            }
+        });
+    });
+    
+    function saveFactoryChanges(id, editInput, displaySpan, editBtn) {
+        const newName = editInput.value.trim();
+        if (newName) {
+            // Исправлено: factories вместо factorys
+            fetch(`/factories/${id}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `name=${encodeURIComponent(newName)}`
+            }).then(response => {
+                if (response.ok) {
+                    displaySpan.textContent = newName;
+                    displaySpan.style.display = 'inline';
+                    editInput.style.display = 'none';
+                    editBtn.innerHTML = '<i class="bi bi-pencil"></i> Изменить';
+                    editBtn.classList.remove('btn-success');
+                    editBtn.classList.add('btn-outline-primary');
+                    
+                    // Обновляем ссылку в кнопке "Иерархия" если нужно
+                    const relationsLink = editBtn.closest('tr').querySelector('.btn-warning');
+                    if (relationsLink) {
+                        relationsLink.href = `/relations/factory/${id}`;
+                    }
+                } else {
+                    alert('Ошибка при сохранении');
+                }
+            }).catch(error => {
+                alert('Ошибка сети: ' + error);
+            });
+        } else {
+            // Отмена редактирования если имя пустое
+            displaySpan.style.display = 'inline';
+            editInput.style.display = 'none';
+            editBtn.innerHTML = '<i class="bi bi-pencil"></i> Изменить';
+            editBtn.classList.remove('btn-success');
+            editBtn.classList.add('btn-outline-primary');
+        }
+    }
+});
+</script>
 {% endblock %}

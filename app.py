@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -13,7 +13,6 @@ class Factory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     
-    # Связь с участками
     sections = db.relationship('Section', back_populates='factory', cascade='all, delete-orphan')
     
     def to_dict(self):
@@ -25,7 +24,6 @@ class Section(db.Model):
     name = db.Column(db.String(100), nullable=False)
     factory_id = db.Column(db.Integer, db.ForeignKey('factories.id'), nullable=False)
     
-    # Связи
     factory = db.relationship('Factory', back_populates='sections')
     equipments = db.relationship('Equipment', secondary='section_equipment', back_populates='sections')
 
@@ -34,22 +32,16 @@ class Equipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     
-    # Связь с участками (многие ко многим)
     sections = db.relationship('Section', secondary='section_equipment', back_populates='equipments')
 
-# Связующая таблица для оборудования и участков
 section_equipment = db.Table('section_equipment',
     db.Column('section_id', db.Integer, db.ForeignKey('sections.id'), primary_key=True),
     db.Column('equipment_id', db.Integer, db.ForeignKey('equipments.id'), primary_key=True)
 )
 
-# ========== ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ВСЕХ РОДИТЕЛЕЙ ==========
+# ========== ФУНКЦИИ ДЛЯ ИЕРАРХИИ ==========
 
 def get_all_parents(item_type, item_id):
-    """
-    Возвращает всех родителей для объекта
-    item_type: 'equipment' или 'section'
-    """
     if item_type == 'equipment':
         equipment = Equipment.query.get(item_id)
         if not equipment:
@@ -57,14 +49,12 @@ def get_all_parents(item_type, item_id):
         
         result = []
         for section in equipment.sections:
-            # Уровень 1: Участок
             result.append({
                 'level': 1,
                 'type': 'section',
                 'name': section.name,
                 'id': section.id
             })
-            # Уровень 2: Фабрика (через участок)
             if section.factory:
                 result.append({
                     'level': 2,
@@ -80,7 +70,6 @@ def get_all_parents(item_type, item_id):
             return []
         
         result = []
-        # Уровень 1: Фабрика
         if section.factory: 
             result.append({
                 'level': 1,
@@ -93,9 +82,6 @@ def get_all_parents(item_type, item_id):
     return []
 
 def get_all_children(item_type, item_id):
-    """
-    Возвращает всех детей для объекта
-    """
     if item_type == 'factory':
         factory = Factory.query.get(item_id)
         if not factory:
@@ -103,14 +89,12 @@ def get_all_children(item_type, item_id):
         
         result = []
         for section in factory.sections:
-            # Уровень 1: Участки
             result.append({
                 'level': 1,
                 'type': 'section',
                 'name': section.name,
                 'id': section.id
             })
-            # Уровень 2: Оборудование на этих участках
             for equipment in section.equipments:
                 result.append({
                     'level': 2,
@@ -137,7 +121,7 @@ def get_all_children(item_type, item_id):
     
     return []
 
-# ========== МАРШРУТЫ (СТРАНИЦЫ) ==========
+# ========== МАРШРУТЫ ==========
 
 @app.route('/')
 def index():
@@ -156,6 +140,16 @@ def create_factory():
         factory = Factory(name=name)
         db.session.add(factory)
         db.session.commit()
+    return redirect(url_for('list_factories'))
+
+@app.route('/factories/<int:id>/update', methods=['POST'])
+def update_factory(id):
+    factory = Factory.query.get(id)
+    if factory:
+        name = request.form.get('name')
+        if name:
+            factory.name = name
+            db.session.commit()
     return redirect(url_for('list_factories'))
 
 @app.route('/factories/<int:id>/delete')
@@ -180,6 +174,19 @@ def create_section():
     if name and factory_id:
         section = Section(name=name, factory_id=int(factory_id))
         db.session.add(section)
+        db.session.commit()
+    return redirect(url_for('list_sections'))
+
+@app.route('/sections/<int:id>/update', methods=['POST'])
+def update_section(id):
+    section = Section.query.get(id)
+    if section:
+        name = request.form.get('name')
+        if name:
+            section.name = name
+        factory_id = request.form.get('factory_id')
+        if factory_id:
+            section.factory_id = int(factory_id)
         db.session.commit()
     return redirect(url_for('list_sections'))
 
@@ -216,6 +223,27 @@ def create_equipment():
         db.session.commit()
     return redirect(url_for('list_equipments'))
 
+@app.route('/equipments/<int:id>/update', methods=['POST'])
+def update_equipment(id):
+    equipment = Equipment.query.get(id)
+    if equipment:
+        name = request.form.get('name')
+        if name:
+            equipment.name = name
+        
+        # Очищаем существующие связи
+        equipment.sections.clear()
+        
+        # Добавляем новые связи
+        section_ids = request.form.getlist('section_ids')
+        for section_id in section_ids:
+            section = Section.query.get(int(section_id))
+            if section:
+                equipment.sections.append(section)
+        
+        db.session.commit()
+    return redirect(url_for('list_equipments'))
+
 @app.route('/equipments/<int:id>/delete')
 def delete_equipment(id):
     equipment = Equipment.query.get(id)
@@ -243,7 +271,14 @@ def view_relations(type, id):
                          parents=parents, 
                          children=children)
 
-# ========== ЗАПУСК ==========
+@app.route('/equipments/<int:id>/sections')
+def get_equipment_sections(id):
+    equipment = Equipment.query.get(id)
+    if equipment:
+        section_ids = [s.id for s in equipment.sections]
+        return jsonify({'section_ids': section_ids})
+    return jsonify({'section_ids': []})
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
